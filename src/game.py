@@ -37,4 +37,5 @@ class Game:
 if __name__ == "__main__":
     game_settings = GameSettings()
     achievement_system = AchievementSystem()
-    ui = UI(game_settings, achievement_system)  # Initializes the UI and starts the game
+    game = Game(game_settings, achievement_system)  # Create a Game instance
+    game.start_game()  # Start the game
