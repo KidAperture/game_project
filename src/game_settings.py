@@ -1,6 +1,6 @@
 class GameSettings:
-    def __init__(self):
-        self.difficulty = "Normal"
+    def __init__(self, difficulty="Normal"):
+        self.difficulty = difficulty
         self.time_limit = 60  # Default time limit in seconds
         self.deck_size = 52  # Default deck size
         self.max_discards = 1  # Max cards to discard
@@ -23,4 +23,11 @@ class GameSettings:
             self.deck_size = 50
             self.max_discards = 1
             self.max_jokers = 0
+
+    def display_settings(self):
         print(f"Game difficulty set to {self.difficulty}: Time limit = {self.time_limit}s, Deck size = {self.deck_size}, Max discards = {self.max_discards}, Max jokers = {self.max_jokers}")
+
+# Example usage
+if __name__ == "__main__":
+    settings = GameSettings("Easy")
+    settings.display_settings()
