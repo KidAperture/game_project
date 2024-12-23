@@ -22,12 +22,7 @@ class UI:
             self.game_settings.difficulty = "Hard"
         self.game_settings.apply_difficulty()
         print(f"Difficulty set to: {self.game_settings.difficulty}")
-        self.start_game()
-
-    def start_game(self):
-        """Start the game with the selected difficulty."""
-        game = Game(self.game_settings, self.achievement_system)
-        game.start_game()
+        self.update_difficulty_info()
 
     def update_difficulty_info(self):
         """Update and display the UI elements related to difficulty."""
@@ -38,13 +33,11 @@ class UI:
 
     def display_timer(self):
         """Display the countdown timer for the time limit."""
-        print(f"Time remaining: {self.timer} seconds", end="\r")
-        if self.timer > 0:
+        while self.timer > 0:
+            print(f"Time remaining: {self.timer} seconds", end="\r")
             time.sleep(1)
             self.timer -= 1
-            self.display_timer()
-        else:
-            print("\nTime's up! Proceeding to the next phase.")
+        print("\nTime's up! Proceeding to the next phase.")
 
     def show_game_progress(self, player_stats):
         """Show the player stats and game progress."""
