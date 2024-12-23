@@ -21,4 +21,4 @@ function renderHand() {
     cardElement.innerText = `${card.value} of ${card.suit}`;
     gameBoard.appendChild(cardElement);
   });
-}
+} 
