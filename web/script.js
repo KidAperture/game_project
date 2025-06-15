@@ -6,14 +6,14 @@ window.game = game; // Make game instance global for shop button onclicks
 
 let selectedCardIndex = -1; // Track selected card
 
-document.addEventListener('DOMContentLoaded', async () => { // Made async
+document.addEventListener('DOMContentLoaded', () => { // Removed async
   const difficultySelect = prompt("Select difficulty: easy, normal, hard") || 'normal';
-  await game.initializeGame(difficultySelect); // await initialization
-  await game.syncAchievements(); // Sync achievements from backend
-  game.updateStats(); // Initial stats display
-  game.updateShop();  // Initial shop display
+  game.initializeGame(difficultySelect); // initializeGame now handles initial stats/shop updates if loading state
+  // Calls to updateStats and updateShop here are redundant if initializeGame handles them post-load.
+  // game.updateStats();
+  // game.updateShop();
 
-  renderHand();
+  renderHand(); // Render hand based on loaded or new game state
 
   const playCardBtn = document.getElementById('play-card-btn');
   playCardBtn.addEventListener('click', () => {

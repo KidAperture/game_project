@@ -7,21 +7,102 @@ class CardGame {
     this.score = 0;
     this.difficulty = 'normal'; // Default difficulty
     this.round = 1;
-    this.wins = 0; // Keep track of wins
+    this.wins = 0;
     this.shopItems = [
       { name: "Extra Health", cost: 10, description: "Increases max health by 5" },
       { name: "Card Draw", cost: 5, description: "Draw an extra card" }
     ];
-    // Achievements will be synced from the backend
-    this.achievements = {};
-    this.unlockedFeatures = {}; // To store features unlocked on the frontend
+    // Define achievements and unlockables locally
+    this.achievementDefinitions = {
+      "first_win": { condition: data => data.wins >= 1, unlocked: false, featureName: "Special Card Pack Details", featureDescription: "Unlocks a special pack of cards." },
+      "high_score_100": { condition: data => data.score >= 100, unlocked: false, featureName: "Golden Card Theme", featureDescription: "A new visual theme for your cards." },
+      "ten_wins": { condition: data => data.wins >= 10, unlocked: false, featureName: "Bonus Coins", featureDescription: "Get 50 bonus coins!" }
+    };
+    this.unlockedFeatures = {};
+    this.localStorageKey = 'cardGameState';
   }
 
-  async initializeGame(difficulty) {
-    this.difficulty = difficulty;
-    this.resetDeck();
-    this.drawInitialHand();
+  initializeGame(difficulty) {
+    if (!this.loadGameState()) {
+      // No saved state, or loading failed, initialize fresh
+      this.difficulty = difficulty;
+      this.coins = 0;
+      this.score = 0;
+      this.round = 1;
+      this.wins = 0;
+      this.deck = [];
+      this.hand = [];
+      // Reset achievement status
+      for (const achKey in this.achievementDefinitions) {
+        if (this.achievementDefinitions.hasOwnProperty(achKey)) {
+          this.achievementDefinitions[achKey].unlocked = false;
+        }
+      }
+      this.unlockedFeatures = {};
+      this.resetDeck(); // Creates and shuffles deck
+      this.drawInitialHand();
+    }
+    // Always update UI elements after initialization (either loaded or fresh)
     this.updateStats();
+    this.updateShop(); // In case shop appearance depends on game state not covered by stats
+    // Potentially re-render hand or other UI elements if needed
+  }
+
+  saveGameState() {
+    const state = {
+      coins: this.coins,
+      score: this.score,
+      round: this.round,
+      difficulty: this.difficulty,
+      wins: this.wins,
+      hand: this.hand, // Saving hand might be complex if cards have methods, ensure serializable
+      deck: this.deck, // Same as hand
+      achievementDefinitions: this.achievementDefinitions, // Stores unlocked status
+      unlockedFeatures: this.unlockedFeatures
+    };
+    try {
+      localStorage.setItem(this.localStorageKey, JSON.stringify(state));
+      console.log("Game state saved.");
+    } catch (e) {
+      console.error("Error saving game state to localStorage:", e);
+    }
+  }
+
+  loadGameState() {
+    try {
+      const savedState = localStorage.getItem(this.localStorageKey);
+      if (savedState === null) {
+        console.log("No saved game state found.");
+        return false;
+      }
+      const state = JSON.parse(savedState);
+
+      this.coins = state.coins || 0;
+      this.score = state.score || 0;
+      this.round = state.round || 1;
+      this.difficulty = state.difficulty || 'normal';
+      this.wins = state.wins || 0;
+      this.hand = state.hand || [];
+      this.deck = state.deck || [];
+
+      // Important: Merge achievement definitions, don't just overwrite
+      // This ensures if we add new achievements in code, they are picked up.
+      if (state.achievementDefinitions) {
+        for (const achKey in this.achievementDefinitions) {
+          if (this.achievementDefinitions.hasOwnProperty(achKey) && state.achievementDefinitions.hasOwnProperty(achKey)) {
+            this.achievementDefinitions[achKey].unlocked = state.achievementDefinitions[achKey].unlocked;
+          }
+        }
+      }
+      this.unlockedFeatures = state.unlockedFeatures || {};
+
+      console.log("Game state loaded.");
+      return true;
+    } catch (e) {
+      console.error("Error loading game state from localStorage:", e);
+      // Optionally clear corrupted state: localStorage.removeItem(this.localStorageKey);
+      return false;
+    }
   }
 
   resetDeck() {
@@ -71,7 +152,7 @@ class CardGame {
       this.winRound();
     }
     this.updateStats();
-    // Removed direct checkAchievements call, will be part of sync or specific events
+    this.saveGameState(); // Save state after advancing round
   }
 
   winRound() {
@@ -79,14 +160,17 @@ class CardGame {
     this.wins++;
     this.coins += 5; // Award 5 coins for winning
     this.score += 10; // Increase score
-    // Call checkAchievements to notify backend
-    this.checkAchievements();
+    this.checkAchievements(); // This will call unlockFeature, which should save state
+    // No need to call saveGameState here if checkAchievements -> unlockFeature saves it.
+    // However, if checkAchievements doesn't always result in an unlock, save here.
+    this.saveGameState();
   }
 
   loseRound() {
     console.log("Round lost!");
     // Handle loss (e.g., reset score, end game)
     this.score = 0; // Reset score on loss for simplicity
+    this.saveGameState();
   }
 
   updateShop() {
@@ -119,30 +203,23 @@ class CardGame {
     // Apply item effect (e.g., increase health, add cards)
     this.updateStats();
     this.updateShop(); // Refresh shop to reflect changes (e.g., if item is one-time purchase)
+    this.saveGameState();
   }
 
-  unlockFeature(featureName, featureDetails) {
-    if (!this.unlockedFeatures[featureName]) {
-      this.unlockedFeatures[featureName] = featureDetails || true;
-      console.log("Unlocked feature on frontend:", featureName, featureDetails);
+  unlockFeature(featureKey, featureDetails) { // featureKey is like 'first_win'
+    if (!this.unlockedFeatures[featureKey]) {
+      this.unlockedFeatures[featureKey] = featureDetails; // Store the details object
+      console.log("Unlocked feature on frontend:", featureKey, featureDetails.featureName, featureDetails.featureDescription);
       // Add logic to make the feature available to the player
       // For example, add a new set of cards or a new game mode, update UI
-      alert(`New Feature Unlocked: ${featureDetails || featureName}`);
+      alert(`New Feature Unlocked: ${featureDetails.featureName} - ${featureDetails.featureDescription}`);
+      this.saveGameState(); // Save state when a feature is unlocked
     }
   }
 
-  processUnlockables(unlockedItems) {
-    if (!unlockedItems) return;
-    for (const achKey in unlockedItems) {
-      if (unlockedItems.hasOwnProperty(achKey)) {
-        const featureDetails = unlockedItems[achKey];
-        // Use achKey or a more descriptive name if your backend provides one for the feature itself
-        this.unlockFeature(achKey, featureDetails);
-      }
-    }
-  }
+  // processUnlockables and syncAchievements removed.
 
-  async checkAchievements() {
+  checkAchievements() {
     const gameState = {
       score: this.score,
       wins: this.wins,
@@ -150,49 +227,22 @@ class CardGame {
       // Add any other data relevant for achievements
     };
 
-    try {
-      const response = await fetch('/api/achievements/check', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(gameState),
-      });
-      if (!response.ok) {
-        console.error("Failed to check achievements:", response.status, await response.text());
-        return;
+    for (const achKey in this.achievementDefinitions) {
+      if (this.achievementDefinitions.hasOwnProperty(achKey)) {
+        const ach = this.achievementDefinitions[achKey];
+        if (!ach.unlocked && ach.condition(gameState)) {
+          ach.unlocked = true;
+          // Pass the whole achievement object which contains featureName and featureDescription
+          this.unlockFeature(achKey, { featureName: ach.featureName, featureDescription: ach.featureDescription });
+          // unlockFeature will call saveGameState if a new feature is actually unlocked.
+          console.log("Achievement unlocked locally:", achKey, "-", ach.featureName);
+        }
       }
-      const data = await response.json();
-      console.log("Backend checkAchievements response:", data);
-      if (data.achievements) {
-        this.achievements = data.achievements;
-      }
-      if (data.unlocked_items) {
-        this.processUnlockables(data.unlocked_items);
-      }
-    } catch (error) {
-      console.error("Error checking achievements:", error);
     }
-  }
-
-  async syncAchievements() {
-    try {
-      const response = await fetch('/api/achievements/status');
-      if (!response.ok) {
-        console.error("Failed to sync achievements:", response.status, await response.text());
-        return;
-      }
-      const data = await response.json();
-      console.log("Backend syncAchievements response:", data);
-      if (data.achievements) {
-        this.achievements = data.achievements;
-      }
-      if (data.unlocked_items) {
-        this.processUnlockables(data.unlocked_items);
-      }
-    } catch (error) {
-      console.error("Error syncing achievements:", error);
-    }
+    // It might be good to save state even if no new achievement is unlocked,
+    // if other parts of checkAchievements could change game state in the future.
+    // For now, only unlocking a feature saves state. If checkAchievements itself
+    // modified something like 'attempt_count', then saveGameState() would be needed here.
   }
 }
 
